@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from datetime import datetime, timezone
-
+# Database Table
 from app.database.base import Base
 
 
