@@ -8,6 +8,8 @@ from app.schemas.deployment import (
     DeploymentResponse
 )
 
+from app.services import deployment_service
+
 router = APIRouter(tags=["deployments"])
 
 @router.post(
@@ -19,19 +21,7 @@ def create_deployment(
     db: Session = Depends(get_db)
 ):
 
-    deployment = Deployment(
-        app_name=deployment_data.app_name,
-        image_name=deployment_data.image_name,
-        replicas=deployment_data.replicas,
-        container_port=deployment_data.container_port,
-        status="running"
-    )
-
-    db.add(deployment)
-    db.commit()
-    db.refresh(deployment)
-
-    return deployment
+    return deployment_service.create_deployment(deployment_data, db)
 
 @router.get(
     "/deployments",
@@ -41,9 +31,7 @@ def get_deployments(
     db: Session = Depends(get_db)
 ):
 
-    deployments = db.query(Deployment).all()
-
-    return deployments
+    return deployment_service.get_deployments(db)
 
 @router.get(
     "/deployments/{deployment_id}",
@@ -54,19 +42,7 @@ def get_deployment(
     db: Session = Depends(get_db)
 ):
 
-    deployment = (
-        db.query(Deployment)
-        .filter(Deployment.id == deployment_id)
-        .first()
-    )
-
-    if not deployment:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Deployment with id {deployment_id} not found"
-        )
-
-    return deployment
+    return deployment_service.get_deployment(deployment_id, db)
 
 @router.put(
     "/deployments/{deployment_id}",
@@ -78,27 +54,7 @@ def update_deployment(
     db: Session = Depends(get_db)
 ):
 
-    deployment = (
-        db.query(Deployment)
-        .filter(Deployment.id == deployment_id)
-        .first()
-    )
-
-    if not deployment:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Deployment with id {deployment_id} not found"
-        )
-
-    deployment.app_name = deployment_data.app_name
-    deployment.image_name = deployment_data.image_name
-    deployment.replicas = deployment_data.replicas
-    deployment.container_port = deployment_data.container_port
-
-    db.commit()
-    db.refresh(deployment)
-
-    return deployment
+    return deployment_service.update_deployment(deployment_id, deployment_data, db)
 
 @router.delete("/deployments/{deployment_id}")
 def delete_deployment(
@@ -106,21 +62,4 @@ def delete_deployment(
     db: Session = Depends(get_db)
 ):
 
-    deployment = (
-        db.query(Deployment)
-        .filter(Deployment.id == deployment_id)
-        .first()
-    )
-
-    if not deployment:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Deployment with id {deployment_id} not found"
-        )
-
-    db.delete(deployment)
-    db.commit()
-
-    return {
-        "message": f"Deployment with id {deployment_id} deleted successfully"
-    }
+    return deployment_service.delete_deployment(deployment_id, db)
