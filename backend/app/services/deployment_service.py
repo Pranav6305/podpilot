@@ -1,20 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from app.database.database import get_db
+
 from app.models.deployment import Deployment
-from app.schemas.deployment import (
-    DeploymentCreate,
-    DeploymentResponse
+from app.schemas.deployment import DeploymentCreate
+
+from app.services.kubernetes_service import (
+    create_deployment as create_k8s_deployment,
+    delete_deployment as delete_k8s_deployment,
 )
 
-def create_deployment(deployment_data: DeploymentCreate, db: Session = Depends(get_db)):
+
+def create_deployment(
+    deployment_data: DeploymentCreate,
+    db: Session
+):
+
+    create_k8s_deployment(
+        app_name=deployment_data.app_name,
+        image_name=deployment_data.image_name,
+        replicas=deployment_data.replicas,
+    )
 
     deployment = Deployment(
         app_name=deployment_data.app_name,
         image_name=deployment_data.image_name,
         replicas=deployment_data.replicas,
         container_port=deployment_data.container_port,
-        status="running"
+        status="running",
     )
 
     db.add(deployment)
@@ -23,17 +35,17 @@ def create_deployment(deployment_data: DeploymentCreate, db: Session = Depends(g
 
     return deployment
 
-def get_deployments(
-    db: Session = Depends(get_db)
-):
+
+def get_deployments(db: Session):
 
     deployments = db.query(Deployment).all()
 
     return deployments
 
+
 def get_deployment(
     deployment_id: int,
-    db: Session = Depends(get_db)
+    db: Session,
 ):
 
     deployment = (
@@ -45,15 +57,16 @@ def get_deployment(
     if not deployment:
         raise HTTPException(
             status_code=404,
-            detail=f"Deployment with id {deployment_id} not found"
+            detail=f"Deployment with id {deployment_id} not found",
         )
 
     return deployment
 
+
 def update_deployment(
     deployment_id: int,
     deployment_data: DeploymentCreate,
-    db: Session = Depends(get_db)
+    db: Session,
 ):
 
     deployment = (
@@ -65,7 +78,7 @@ def update_deployment(
     if not deployment:
         raise HTTPException(
             status_code=404,
-            detail=f"Deployment with id {deployment_id} not found"
+            detail=f"Deployment with id {deployment_id} not found",
         )
 
     deployment.app_name = deployment_data.app_name
@@ -78,9 +91,10 @@ def update_deployment(
 
     return deployment
 
+
 def delete_deployment(
     deployment_id: int,
-    db: Session = Depends(get_db)
+    db: Session,
 ):
 
     deployment = (
@@ -92,8 +106,12 @@ def delete_deployment(
     if not deployment:
         raise HTTPException(
             status_code=404,
-            detail=f"Deployment with id {deployment_id} not found"
+            detail=f"Deployment with id {deployment_id} not found",
         )
+
+    delete_k8s_deployment(
+        deployment.app_name
+    )
 
     db.delete(deployment)
     db.commit()
