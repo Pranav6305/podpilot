@@ -9,11 +9,10 @@ from app.services.kubernetes_service import (
     delete_deployment as delete_k8s_deployment,
 )
 
+from app.services.kubernetes_service import get_deployment, get_deployment_status
 
-def create_deployment(
-    deployment_data: DeploymentCreate,
-    db: Session
-):
+
+def create_deployment(deployment_data: DeploymentCreate, db: Session):
 
     create_k8s_deployment(
         app_name=deployment_data.app_name,
@@ -40,6 +39,12 @@ def get_deployments(db: Session):
 
     deployments = db.query(Deployment).all()
 
+    for deployment in deployments:
+        current_status = get_deployment_status(app_name=deployment.app_name)
+        deployment.status = current_status
+
+    db.commit()
+
     return deployments
 
 
@@ -48,17 +53,19 @@ def get_deployment(
     db: Session,
 ):
 
-    deployment = (
-        db.query(Deployment)
-        .filter(Deployment.id == deployment_id)
-        .first()
-    )
+    deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
 
     if not deployment:
         raise HTTPException(
             status_code=404,
             detail=f"Deployment with id {deployment_id} not found",
         )
+
+    current_status = get_deployment_status(app_name=deployment.app_name)
+    deployment.status = current_status
+
+    db.commit()
+    db.refresh(deployment)
 
     return deployment
 
@@ -69,11 +76,7 @@ def update_deployment(
     db: Session,
 ):
 
-    deployment = (
-        db.query(Deployment)
-        .filter(Deployment.id == deployment_id)
-        .first()
-    )
+    deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
 
     if not deployment:
         raise HTTPException(
@@ -97,11 +100,7 @@ def delete_deployment(
     db: Session,
 ):
 
-    deployment = (
-        db.query(Deployment)
-        .filter(Deployment.id == deployment_id)
-        .first()
-    )
+    deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
 
     if not deployment:
         raise HTTPException(
@@ -109,13 +108,9 @@ def delete_deployment(
             detail=f"Deployment with id {deployment_id} not found",
         )
 
-    delete_k8s_deployment(
-        deployment.app_name
-    )
+    delete_k8s_deployment(deployment.app_name)
 
     db.delete(deployment)
     db.commit()
 
-    return {
-        "message": f"Deployment with id {deployment_id} deleted successfully"
-    }
+    return {"message": f"Deployment with id {deployment_id} deleted successfully"}
