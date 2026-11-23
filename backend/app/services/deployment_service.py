@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.deployment import Deployment
 from app.schemas.deployment import DeploymentCreate
+from app.services.kubernetes_service import create_service
 
 from app.services.kubernetes_service import (
     create_deployment as create_k8s_deployment,
@@ -18,6 +19,11 @@ def create_deployment(deployment_data: DeploymentCreate, db: Session):
         app_name=deployment_data.app_name,
         image_name=deployment_data.image_name,
         replicas=deployment_data.replicas,
+    )
+
+    create_service(
+        app_name=deployment_data.app_name,
+        container_port=deployment_data.container_port,
     )
 
     deployment = Deployment(
@@ -112,5 +118,6 @@ def delete_deployment(
 
     db.delete(deployment)
     db.commit()
+    db.refresh(deployment)
 
     return {"message": f"Deployment with id {deployment_id} deleted successfully"}

@@ -4,7 +4,8 @@ from kubernetes.client.rest import ApiException
 
 config.load_kube_config()
 
-apps_v1 = client.AppsV1Api()
+apps_v1 = client.AppsV1Api() # belongs to deployments
+core_v1 = client.CoreV1Api() # belongs to services
 
 
 def list_deployments():
@@ -106,6 +107,38 @@ def get_deployment_status(app_name):
             return "Not Found"
 
         raise e
+
+def create_service(
+        app_name,
+        container_port,
+):
+    service = client.V1Service(
+        metadata=client.V1ObjectMeta(
+            name=app_name,
+        ),
+
+        spec=client.V1ServiceSpec(
+            selector={
+                "app":app_name
+            },
+
+            ports=[
+                client.V1ServicePort(
+                    port=container_port,
+                    target_port=container_port,
+                )
+            ],
+
+            type="ClusterIP",
+        ),
+    )
+
+    response = core_v1.create_namespaced_service(
+        namespace="default",
+        body=service
+    )
+
+    return response
 
 
 if __name__ == "__main__":
