@@ -59,7 +59,7 @@ def update_deployment(
 @router.delete("/deployments/{deployment_id}")
 def delete_deployment(
     deployment_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
 
     return deployment_service.delete_deployment(deployment_id, db)

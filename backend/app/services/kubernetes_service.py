@@ -45,6 +45,37 @@ def create_deployment(
 
     return response
 
+def create_service(
+        app_name,
+        container_port,
+):
+    service = client.V1Service(
+        metadata=client.V1ObjectMeta(
+            name=app_name,
+        ),
+
+        spec=client.V1ServiceSpec(
+            selector={
+                "app":app_name
+            },
+
+            ports=[
+                client.V1ServicePort(
+                    port=container_port,
+                    target_port=container_port,
+                )
+            ],
+
+            type="ClusterIP",
+        ),
+    )
+
+    response = core_v1.create_namespaced_service(
+        namespace="default",
+        body=service
+    )
+
+    return response
 
 def get_deployment(app_name):
 
@@ -65,6 +96,15 @@ def delete_deployment(app_name):
 
     return response
 
+def delete_service(
+        app_name
+):
+    response = core_v1.delete_namespaced_service(
+        name=app_name,
+        namespace="default",
+    )
+
+    return response
 
 def get_deployment_status(app_name):
 
@@ -107,38 +147,6 @@ def get_deployment_status(app_name):
             return "Not Found"
 
         raise e
-
-def create_service(
-        app_name,
-        container_port,
-):
-    service = client.V1Service(
-        metadata=client.V1ObjectMeta(
-            name=app_name,
-        ),
-
-        spec=client.V1ServiceSpec(
-            selector={
-                "app":app_name
-            },
-
-            ports=[
-                client.V1ServicePort(
-                    port=container_port,
-                    target_port=container_port,
-                )
-            ],
-
-            type="ClusterIP",
-        ),
-    )
-
-    response = core_v1.create_namespaced_service(
-        namespace="default",
-        body=service
-    )
-
-    return response
 
 
 if __name__ == "__main__":

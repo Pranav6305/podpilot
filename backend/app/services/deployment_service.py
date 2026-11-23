@@ -1,13 +1,15 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from kubernetes.client.exceptions import ApiException
 
 from app.models.deployment import Deployment
 from app.schemas.deployment import DeploymentCreate
-from app.services.kubernetes_service import create_service
+from app.services.kubernetes_service import create_service, delete_service
 
 from app.services.kubernetes_service import (
     create_deployment as create_k8s_deployment,
     delete_deployment as delete_k8s_deployment,
+    get_deployment as get_k8s_deployment # retrieves a Deployment from Kubernetes
 )
 
 from app.services.kubernetes_service import get_deployment, get_deployment_status
@@ -46,18 +48,26 @@ def get_deployments(db: Session):
     deployments = db.query(Deployment).all()
 
     for deployment in deployments:
-        current_status = get_deployment_status(app_name=deployment.app_name)
-        deployment.status = current_status
+        try:
+            k8s_deployment = get_k8s_deployment(deployment.app_name)
+            deployment.status = get_deployment_status(deployment.app_name)
+            deployment.replicas = k8s_deployment.spec.replicas or 0
+
+        except ApiException as e:
+            if e.status == 404:
+                deployment.status= "Not Found"
+            else:
+                raise
 
     db.commit()
 
     return deployments
 
 
-def get_deployment(
+def get_deployment( 
     deployment_id: int,
     db: Session,
-):
+): # retrieves a record from PostgreSQL using its integer ID
 
     deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
 
@@ -105,19 +115,37 @@ def delete_deployment(
     deployment_id: int,
     db: Session,
 ):
-
-    deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
+    deployment = (
+        db.query(Deployment)
+        .filter(Deployment.id == deployment_id)
+        .first()
+    )
 
     if not deployment:
         raise HTTPException(
             status_code=404,
-            detail=f"Deployment with id {deployment_id} not found",
+            detail=f"Deployment with ID {deployment_id} not found",
         )
 
-    delete_k8s_deployment(deployment.app_name)
+    app_name = deployment.app_name
+
+    try:
+        delete_k8s_deployment(app_name)
+
+    except ApiException as e:
+        if e.status != 404:
+            raise
+
+    try:
+        delete_service(app_name)
+
+    except ApiException as e:
+        if e.status != 404:
+            raise
 
     db.delete(deployment)
     db.commit()
-    db.refresh(deployment)
 
-    return {"message": f"Deployment with id {deployment_id} deleted successfully"}
+    return {
+        "message": f"Deployment {app_name} deleted successfully"
+    }
